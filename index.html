@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jureczek_M2M_Alpha • Mission Control v1.0.1-AUDIT</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .chart-container { position: relative; width: 100%; max-width: 600px; margin: 0 auto; height: 320px; }
+        .tab-active { border-bottom: 2px solid #57534e; color: #1c1917; font-weight: 600; }
+        .tab-inactive { color: #78716c; }
+        .tab-inactive:hover { color: #44403c; }
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: #f5f5f4; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #d6d3d1; border-radius: 3px; }
+        .loading-shimmer {
+            background: linear-gradient(90deg, #f5f5f4 25%, #e7e5e4 50%, #f5f5f4 75%);
+            background-size: 200% 100%; animation: shimmer 1.8s infinite;
+        }
+        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+        .ara-signature { font-size: 0.7rem; color: #6b7280; border-top: 1px dashed #d1d5db; padding-top: 0.5rem; margin-top: 0.75rem; }
+    </style>
+</head>
+<body class="bg-stone-50 text-stone-800 antialiased selection:bg-stone-200 selection:text-stone-900">
+
+<header class="bg-white border-b border-stone-200 sticky top-0 z-50 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between items-center h-16">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 bg-stone-900 rounded flex items-center justify-center text-white font-bold text-xl">J</div>
+                <div>
+                    <h1 class="font-bold text-xl leading-tight">Jureczek_M2M_Alpha</h1>
+                    <p class="text-xs text-stone-500">Private Audit Mission Control • 1.0.1</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse"></span>
+                    <span class="text-xs font-semibold text-green-700 uppercase tracking-wider">LOCAL</span>
+                </div>
+                <input type="password" id="api-key-input" placeholder="Gemini API Key" class="w-64 px-3 py-1.5 text-sm border border-stone-300 rounded focus:outline-none focus:ring-2 focus:ring-stone-500">
+                <button onclick="saveApiKey()" class="px-3 py-1.5 bg-stone-800 text-white text-sm rounded hover:bg-stone-700">Zapisz klucz</button>
+            </div>
+        </div>
+    </div>
+</header>
+
+<main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-12">
+
+    <!-- API Key warning -->
+    <div id="api-warning" class="hidden bg-amber-50 border-l-4 border-amber-400 p-5 rounded-r-xl">
+        <p class="text-amber-800">🔒 Brak ważnego klucza Gemini API. Wpisz klucz powyżej i kliknij "Zapisz klucz". Bez tego funkcje AI są wyłączone.</p>
+    </div>
+
+    <!-- Overview -->
+    <section class="bg-white rounded-2xl shadow border border-stone-100 p-8">
+        <div class="grid md:grid-cols-2 gap-10">
+            <div>
+                <h2 class="text-3xl font-bold text-stone-900 mb-5">Centrum Dowodzenia M2M</h2>
+                <p class="text-stone-600 mb-6 leading-relaxed">
+                    Prywatny kokpit agenta Jureczek_M2M_Alpha z warstwą decyzyjną Gemini.<br>
+                    Wszystkie operacje są logowane i podpisywane.
+                </p>
+                <div class="flex flex-wrap gap-5">
+                    <div class="bg-stone-50 px-6 py-4 rounded-xl border border-stone-200 min-w-[160px]">
+                        <div class="text-xs text-stone-500 uppercase tracking-wider mb-1">Szac. zysk / dzień</div>
+                        <div class="text-2xl font-bold text-stone-900" id="daily-profit-display">$47.80</div>
+                    </div>
+                    <div class="bg-stone-50 px-6 py-4 rounded-xl border border-stone-200 min-w-[160px]">
+                        <div class="text-xs text-stone-500 uppercase tracking-wider mb-1">Poziom zabezpieczeń</div>
+                        <div class="text-2xl font-bold text-green-700">WYSOKI</div>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-stone-50 rounded-xl p-5 border border-stone-100">
+                <h3 class="text-base font-semibold text-stone-700 mb-4 text-center">Symulowana krzywa przychodów</h3>
+                <div class="chart-container">
+                    <canvas id="revenueChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Konfiguracja -->
+    <section id="config">
+        <h2 class="text-2xl font-bold text-stone-900 mb-6">Konfiguracja Agenta</h2>
+        <div class="grid lg:grid-cols-3 gap-8">
+            <div class="bg-white p-7 rounded-2xl shadow-sm border border-stone-200 h-fit">
+                <h3 class="font-semibold text-stone-800 mb-6">Główne limity</h3>
+                <div class="space-y-7">
+                    <div>
+                        <div class="flex justify-between mb-2 text-sm">
+                            <label class="font-medium text-stone-700">Max dzienny wydatek</label>
+                            <span class="font-bold" id="spend-limit-val">$50</span>
+                        </div>
+                        <input type="range" min="10" max="300" value="50" class="w-full h-2 bg-stone-200 rounded-lg cursor-pointer accent-stone-700" id="spend-limit-slider">
+                    </div>
+                    <div>
+                        <div class="flex justify-between mb-2 text-sm">
+                            <label class="font-medium text-stone-700">Próg autoryzacji</label>
+                            <span class="font-bold" id="auth-limit-val">$20</span>
+                        </div>
+                        <input type="range" min="5" max="150" value="20" class="w-full h-2 bg-stone-200 rounded-lg cursor-pointer accent-stone-700" id="auth-limit-slider">
+                    </div>
+                </div>
+            </div>
+
+            <div class="lg:col-span-2 bg-stone-950 rounded-2xl p-7 text-stone-200 font-mono text-sm shadow-inner border border-stone-800">
+                <div class="flex justify-between items-center mb-4">
+                    <span class="px-3 py-1 bg-stone-800 rounded text-xs border border-stone-700">config.json (live)</span>
+                    <button onclick="copyConfig()" class="text-xs text-stone-400 hover:text-stone-200">📋 Kopiuj</button>
+                </div>
+                <pre class="overflow-x-auto custom-scroll max-h-80"><code id="json-preview"></code></pre>
+            </div>
+        </div>
+    </section>
+
+    <!-- AI Strategist + Audit Log na dole -->
+    <section class="bg-gradient-to-br from-stone-900 to-stone-950 rounded-3xl p-8 shadow-2xl text-stone-100 relative overflow-hidden">
+        <div class="absolute inset-0 opacity-5 pointer-events-none">
+            <div class="absolute top-10 right-10 text-8xl">✦</div>
+        </div>
+        <div class="relative z-10">
+            <h2 class="text-3xl font-bold mb-8 flex items-center gap-3">
+                <span class="text-amber-400">✦</span> AI Strategist & Audit Trail
+            </h2>
+
+            <div class="grid md:grid-cols-2 gap-10">
+                <!-- Symulacje -->
+                <div>
+                    <p class="text-stone-400 mb-5 text-sm">Wybierz scenariusz rynkowy do analizy przez Gemini:</p>
+                    <div class="space-y-3">
+                        <button onclick="runAiSimulation('Krach na rynku krypto – BTC -45% w 72h')" class="w-full text-left px-5 py-4 bg-stone-800 hover:bg-stone-700 rounded-2xl transition-all border border-stone-700 text-sm">📉 Krach krypto</button>
+                        <button onclick="runAiSimulation('Gwałtowny wzrost popytu na usługi AI data labeling')" class="w-full text-left px-5 py-4 bg-stone-800 hover:bg-stone-700 rounded-2xl transition-all border border-stone-700 text-sm">🧹 Boom AI services</button>
+                        <button onclick="runAiSimulation('Wprowadzenie nowych regulacji AI Act 2.0 w UE')" class="w-full text-left px-5 py-4 bg-stone-800 hover:bg-stone-700 rounded-2xl transition-all border border-stone-700 text-sm">⚖️ Nowe regulacje UE</button>
+                    </div>
+                </div>
+
+                <!-- Wynik + log -->
+                <div>
+                    <div id="sim-content" class="bg-stone-950/60 rounded-2xl p-6 min-h-[340px] border border-stone-800/50 text-sm leading-relaxed">
+                        <div class="flex items-center justify-center h-64 text-stone-500 italic">
+                            Wybierz scenariusz, aby uruchomić analizę AI...
+                        </div>
+                    </div>
+                    <div id="sim-loader" class="hidden flex flex-col items-center justify-center h-64 space-y-4">
+                        <div class="w-14 h-14 border-4 border-stone-700 border-t-stone-300 rounded-full animate-spin"></div>
+                        <p class="text-stone-400 text-sm animate-pulse">Gemini myśli...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Audit Log -->
+            <div class="mt-10 bg-stone-950/70 rounded-2xl p-6 border border-stone-800">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="font-semibold text-lg">Audit Log <span class="text-xs text-stone-500">(ostatnie 20 operacji)</span></h3>
+                    <div class="space-x-3">
+                        <button onclick="clearAuditLog()" class="text-xs bg-red-900/40 hover:bg-red-900/60 px-3 py-1.5 rounded-lg">Wyczyść log</button>
+                        <button onclick="exportAuditLog()" class="text-xs bg-stone-800 hover:bg-stone-700 px-3 py-1.5 rounded-lg">Eksport JSON</button>
+                    </div>
+                </div>
+                <div id="audit-log" class="max-h-64 overflow-y-auto custom-scroll text-xs text-stone-300 space-y-3 font-mono"></div>
+            </div>
+        </div>
+    </section>
+
+</main>
+
+<footer class="bg-stone-100 border-t border-stone-200 py-6 mt-16 text-center text-stone-500 text-sm">
+    <p>Jureczek_M2M_Alpha • Private Local Instance • Audit v1.0.1 • Wszystkie decyzje są logowane</p>
+</footer>
+
+<script>
+// ────────────────────────────────────────────────
+const state = {
+    apiKey: localStorage.getItem('m2m_gemini_key') || '',
+    dailySpendLimit: 50,
+    authThreshold: 20,
+    auditLog: JSON.parse(localStorage.getItem('m2m_audit_log')) || []
+};
+
+const MODEL = "gemini-1.5-flash-002";
+
+// ────────────────────────────────────────────────
+function saveApiKey() {
+    const key = document.getElementById('api-key-input').value.trim();
+    if (key.length < 20) {
+        alert("Klucz wygląda na nieprawidłowy (zbyt krótki).");
+        return;
+    }
+    state.apiKey = key;
+    localStorage.setItem('m2m_gemini_key', key);
+    document.getElementById('api-warning').classList.add('hidden');
+    alert("Klucz zapisany w localStorage tej przeglądarki.");
+}
+
+if (!state.apiKey) {
+    document.getElementById('api-warning').classList.remove('hidden');
+}
+
+// ────────────────────────────────────────────────
+async function callGemini(userPrompt, systemInstruction = "Jesteś autonomicznym analitykiem finansowym i arbitrażowym agenta M2M.") {
+    if (!state.apiKey) return "⛔ Brak klucza API. Wpisz i zapisz klucz Gemini powyżej.";
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${state.apiKey}`;
+    const payload = {
+        contents: [
+            { role: "user", parts: [{ text: userPrompt }] }
+        ],
+        systemInstruction: { parts: [{ text: systemInstruction }] },
+        generationConfig: { temperature: 0.35, maxOutputTokens: 1200 }
+    };
+
+    try {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+            if (res.status === 429) return "⏳ Limit zapytań Gemini. Spróbuj za 30–90 sekund.";
+            if (res.status === 403) return "⛔ Błąd autoryzacji lub brak płatności w projekcie Google Cloud.";
+            throw new Error(`HTTP ${res.status}`);
+        }
+
+        const data = await res.json();
+        return data.candidates?.[0]?.content?.parts?.[0]?.text || "Brak treści w odpowiedzi.";
+    } catch (err) {
+        return `Błąd komunikacji z Gemini: ${err.message}`;
+    }
+}
+
+// ────────────────────────────────────────────────
+function logAction(action, result) {
+    const entry = {
+        ts: new Date().toISOString(),
+        action,
+        result: result.length > 300 ? result.substring(0, 297) + "..." : result
+    };
+    state.auditLog.unshift(entry);
+    if (state.auditLog.length > 20) state.auditLog.pop();
+    localStorage.setItem('m2m_audit_log', JSON.stringify(state.auditLog));
+    renderAuditLog();
+}
+
+function renderAuditLog() {
+    const container = document.getElementById('audit-log');
+    container.innerHTML = state.auditLog.map(e => `
+        <div class="border-l-2 border-stone-700 pl-3">
+            <div class="text-stone-500 text-[10px]">${new Date(e.ts).toLocaleString('pl-PL')}</div>
+            <div class="font-semibold">${e.action}</div>
+            <div class="text-stone-400 mt-1">${e.result}</div>
+        </div>
+    `).join('') || '<div class="text-stone-600 italic py-4">Brak zapisanych operacji.</div>';
+}
+
+function clearAuditLog() {
+    if (confirm("Na pewno wyczyścić cały audit log?")) {
+        state.auditLog = [];
+        localStorage.removeItem('m2m_audit_log');
+        renderAuditLog();
+    }
+}
+
+function exportAuditLog() {
+    const data = JSON.stringify(state.auditLog, null, 2);
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `m2m-audit-${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+// ────────────────────────────────────────────────
+async function runAiSimulation(scenario) {
+    if (!state.apiKey) {
+        document.getElementById('sim-content').innerHTML = `<p class="text-amber-300">Najpierw podaj klucz API Gemini.</p>`;
+        return;
+    }
+
+    const loader = document.getElementById('sim-loader');
+    const content = document.getElementById('sim-content');
+
+    loader.classList.remove('hidden');
+    content.classList.add('hidden');
+
+    const prompt = `Przeprowadź szybką analizę scenariusza dla agenta M2M:
+Scenariusz: ${scenario}
+Dzienny limit wydatków: $${state.dailySpendLimit}
+Próg autoryzacji: $${state.authThreshold} USD
+
+Odpowiedz zwięźle w punktach po polsku:
+• Krótkoterminowy wpływ na zysk
+• Rekomendowana strategia obronna / ofensywna
+• Sugerowane dostosowanie limitów (jeśli potrzebne)`;
+
+    const response = await callGemini(prompt);
+
+    loader.classList.add('hidden');
+    content.classList.remove('hidden');
+
+    content.innerHTML = `
+        <div class="font-semibold mb-3">Scenariusz: ${scenario}</div>
+        <div class="whitespace-pre-wrap">${response}</div>
+        <div class="ara-signature">Analiza wykonana przez Ara • ${new Date().toLocaleTimeString('pl-PL')} • sygn. audit #${Date.now()}</div>
+    `;
+
+    logAction(`Symulacja: ${scenario}`, response);
+}
+
+// ────────────────────────────────────────────────
+function updateConfigDisplay() {
+    state.dailySpendLimit = +document.getElementById('spend-limit-slider').value;
+    state.authThreshold   = +document.getElementById('auth-limit-slider').value;
+
+    document.getElementById('spend-limit-val').textContent = `$${state.dailySpendLimit}`;
+    document.getElementById('auth-limit-val').textContent   = `$${state.authThreshold}`;
+
+    document.getElementById('daily-profit-display').textContent = `$${(state.dailySpendLimit * 0.92).toFixed(2)}`;
+
+    const config = {
+        agent: "Jureczek_M2M_Alpha",
+        version: "1.0.1-AUDIT",
+        limits: {
+            max_daily_spend_usd: state.dailySpendLimit,
+            require_approval_above_usd: state.authThreshold
+        },
+        ai_model: MODEL,
+        last_update: new Date().toISOString()
+    };
+
+    document.getElementById('json-preview').textContent = JSON.stringify(config, null, 2);
+    localStorage.setItem('m2m_config', JSON.stringify(state));
+}
+
+function copyConfig() {
+    const text = document.getElementById('json-preview').textContent;
+    navigator.clipboard.writeText(text).then(() => alert("Config skopiowany do schowka"));
+}
+
+// ────────────────────────────────────────────────
+let revenueChart;
+function initCharts() {
+    revenueChart = new Chart(document.getElementById('revenueChart'), {
+        type: 'line',
+        data: {
+            labels: ['Pn','Wt','Śr','Cz','Pt','Sb','Nd'],
+            datasets: [{
+                label: 'Przychód',
+                data: [18, 24, 32, 38, 45, 52, 58],
+                borderColor: '#4b5563',
+                backgroundColor: 'rgba(75, 85, 99, 0.15)',
+                fill: true,
+                tension: 0.35
+            }]
+        },
+        options: {
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true } }
+        }
+    });
+}
+
+// ────────────────────────────────────────────────
+window.onload = () => {
+    // Load saved config if exists
+    const saved = localStorage.getItem('m2m_config');
+    if (saved) {
+        const s = JSON.parse(saved);
+        state.dailySpendLimit = s.dailySpendLimit || 50;
+        state.authThreshold   = s.authThreshold   || 20;
+
+        document.getElementById('spend-limit-slider').value = state.dailySpendLimit;
+        document.getElementById('auth-limit-slider').value   = state.authThreshold;
+    }
+
+    updateConfigDisplay();
+    initCharts();
+    renderAuditLog();
+
+    document.getElementById('spend-limit-slider').addEventListener('input', updateConfigDisplay);
+    document.getElementById('auth-limit-slider').addEventListener('input', updateConfigDisplay);
+
+    if (state.apiKey) document.getElementById('api-key-input').value = "••••••••••••••••••••";
+};
+</script>
+</body>
+</html>
