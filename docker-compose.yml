@@ -1,0 +1,22 @@
+services:
+  api:
+    build: .
+    env_file: .env
+    volumes: [audit-data:/data]
+    ports: ["8000:8000"]
+    restart: unless-stopped
+  frontend:
+    image: nginx:1.29-alpine
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+    ports: ["8080:80"]
+    depends_on: [api]
+  # Optional OpenAI-compatible on-prem K3 runtime. Enable with: --profile k3
+  k3:
+    image: vllm/vllm-openai:latest
+    profiles: [k3]
+    command: ["--model", "${K3_MODEL_PATH:-/models/kimi-k3}", "--served-model-name", "kimi-k3"]
+    volumes: ["${K3_MODEL_DIR:-./models}:/models:ro"]
+    ports: ["8001:8000"]
+volumes:
+  audit-data:

@@ -1,0 +1,37 @@
+name: test-and-deploy
+on:
+  push: {branches: [main]}
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12', cache: pip}
+      - run: pip install -r requirements.txt
+      - run: pytest -q
+      - run: docker build -t k3-pos-gate:${{ github.sha }} .
+  pages:
+    if: github.event_name == 'push'
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy frontend --project-name=k3-pos-gate
+  vps:
+    if: github.event_name == 'push'
+    needs: test
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: cd /opt/k3-pos-gate && git pull --ff-only && docker compose up -d --build api
